@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jks
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 5Gi
+  hostPath:
+    path: /tmp/DATA
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jks-data
+  namespace: jks
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeName: data
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jks
+  namespace: jks
+spec:
+  selector:
+    matchLabels:
+      app: jks
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      name: jks
+      labels:
+        app: jks
+    spec:
+      volumes:
+        - name: jks-vol
+          persistentVolumeClaim:
+            claimName: jks-data 
+      containers:
+        - name: jks
+          image: jenkins/jenkins
+          ports:
+            - name: jks
+              protocol: TCP
+              containerPort: 8080
+            - name: jks-agent
+              protocol: TCP
+              containerPort: 50000
+          resources:
+            requests: {}
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: jks-vol
+              mountPath: /var/lib/jenkins    
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jks
+  namespace: jks
+spec:
+  type: NodePort
+  selector:
+    app: jks
+  ports:
+    - name: jks
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jks-agent
+  namespace: jks
+spec:
+  selector:
+    apps: jks
+  ports:
+    - name: jks-agent
+      protocol: TCP
+      port: 50000
+      targetPort: 50000
+
+        
+
